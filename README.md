@@ -61,6 +61,23 @@ Free space: 45.2 GB → 52.7 GB (freed 7.5 GB)
 
 For dry-run, the estimated free space after is shown instead.
 
+### Clean only specific categories
+
+```bash
+# Clean only browser/app caches and log files
+mac-storage-cleaner clean --categories caches,logs
+
+# Clean only developer tool caches
+mac-storage-cleaner clean --categories developer
+
+# Clean everything including Docker (adds docker system prune)
+mac-storage-cleaner clean --categories caches,logs,conda,developer,docker
+```
+
+Available categories: `caches`, `logs`, `conda`, `developer`, `docker`.  
+If `--categories` is not specified, all categories except `docker` are cleaned (default behaviour unchanged).  
+A note is printed at the top showing which categories are active.
+
 ### Find large stale files (default: >1 GB, not accessed in 90+ days)
 
 ```bash
