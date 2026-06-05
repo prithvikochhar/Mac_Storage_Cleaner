@@ -3,7 +3,7 @@ name = "mac-storage-cleaner"
 version = "0.1.0"
 description = "A CLI tool to safely clean junk files and find large stale items on macOS"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 dependencies = [
     "click>=8.4.1",
 ]
