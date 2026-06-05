@@ -1,6 +1,7 @@
 import os
 import shutil
 import stat
+import subprocess
 import time
 from pathlib import Path
 
@@ -325,3 +326,70 @@ def _scan_recursive(
             atime = st.st_atime
             if size >= min_bytes and atime < cutoff:
                 results.append((ep, size, atime))
+
+
+_APPS_MIN_BYTES = 500 * 1024 ** 2   # 500 MB
+_APPS_DAYS = 180
+
+
+@main.command("find-large")
+@click.option("--min-size", default="100MB", show_default=True,
+              help="Minimum size for items in Downloads/Documents.")
+@click.option("--days", default=30, show_default=True,
+              help="Flag items in Downloads/Documents not accessed in this many days.")
+def find_large(min_size: str, days: int):
+    """Find large, unused files in Downloads, Documents, and Applications."""
+    min_bytes = _parse_size(min_size)
+    if min_bytes is None:
+        raise click.BadParameter(
+            f"Cannot parse size: {min_size!r}. Use a number followed by B, KB, MB, or GB."
+        )
+
+    now = time.time()
+    cutoff_docs = now - days * 86400
+    cutoff_apps = now - _APPS_DAYS * 86400
+
+    results: list[tuple[Path, int, float]] = []
+
+    for folder in [HOME / "Downloads", HOME / "Documents"]:
+        if folder.exists():
+            _scan_recursive(folder, min_bytes, cutoff_docs, results, depth=0, max_depth=2)
+
+    apps_dir = Path("/Applications")
+    if apps_dir.exists():
+        try:
+            for entry in os.scandir(apps_dir):
+                if not entry.name.endswith(".app"):
+                    continue
+                ep = Path(entry.path)
+                try:
+                    st = entry.stat(follow_symlinks=False)
+                except OSError:
+                    continue
+                size = _dir_size(ep)
+                if size >= _APPS_MIN_BYTES and st.st_atime < cutoff_apps:
+                    results.append((ep, size, st.st_atime))
+        except (PermissionError, OSError):
+            pass
+
+    if not results:
+        click.echo(click.style("No large unused items found.", fg="green"))
+        return
+
+    results.sort(key=lambda x: x[1], reverse=True)
+    click.echo(click.style(f"{'Size':>10}  {'Last Accessed':<22}  Path", bold=True))
+    click.echo("-" * 80)
+    for path, size, atime in results:
+        age_days = int((now - atime) / 86400)
+        label = str(path).replace(str(HOME), "~")
+        click.echo(
+            click.style(f"{_human_size(size):>10}", fg="yellow") +
+            f"  {age_days} days ago{'':<13}  " +
+            click.style(label, fg="red")
+        )
+
+    click.echo()
+    click.echo(
+        "These items have not been used recently. "
+        "Consider deleting them manually to free space."
+    )
