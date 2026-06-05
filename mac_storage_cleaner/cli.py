@@ -123,6 +123,17 @@ def _collect_clean_targets() -> list[tuple[str, list[Path]]]:
     ]
 
 
+# Maps each group name to its --categories keyword
+_GROUP_CATEGORY: dict[str, str] = {
+    "Browser caches": "caches",
+    "App caches (~/Library/Caches)": "caches",
+    "Conda cache": "conda",
+    "Log files (~/Library/Logs)": "logs",
+}
+
+VALID_CATEGORIES = {"caches", "logs", "conda", "developer", "docker"}
+
+
 def _available_dev_tools() -> list[str]:
     return [t for t in ("pip", "uv", "npm") if shutil.which(t) is not None]
 
@@ -251,15 +262,37 @@ def main():
               help="Show what would be deleted without actually deleting anything.")
 @click.option("--yes", "-y", is_flag=True, default=False,
               help="Skip the confirmation prompt.")
-def clean(dry_run: bool, yes: bool):
+@click.option("--categories", default=None,
+              help="Comma-separated list of categories to clean: "
+                   "caches, logs, conda, developer, docker. Defaults to all.")
+def clean(dry_run: bool, yes: bool, categories: "str | None"):
     """Delete browser caches, app caches, logs, and developer caches."""
+    active_cats: "set[str] | None" = None
+    if categories:
+        active_cats = {c.strip().lower() for c in categories.split(",")}
+        invalid = active_cats - VALID_CATEGORIES
+        if invalid:
+            raise click.BadParameter(
+                f"Unknown categories: {', '.join(sorted(invalid))}. "
+                f"Valid: {', '.join(sorted(VALID_CATEGORIES))}",
+                param_hint="--categories",
+            )
+        click.echo(click.style(
+            f"Cleaning categories: {', '.join(sorted(active_cats))}\n",
+            fg="cyan",
+        ))
+
     free_before = shutil.disk_usage("/").free
 
     if dry_run:
         click.echo(click.style("DRY RUN — nothing will be deleted.\n", fg="yellow", bold=True))
 
-    groups = _collect_clean_targets()
-    dev_tools = _available_dev_tools()
+    all_groups = _collect_clean_targets()
+    groups = [
+        (name, paths) for name, paths in all_groups
+        if active_cats is None or _GROUP_CATEGORY.get(name, "caches") in active_cats
+    ]
+    dev_tools = _available_dev_tools() if (active_cats is None or "developer" in active_cats) else []
 
     if not dry_run:
         # Compute sizes and print a summary before asking for confirmation
@@ -339,6 +372,30 @@ def clean(dry_run: bool, yes: bool):
             click.echo(f"  → {_human_size(dev_freed)} {'would be freed' if dry_run else 'freed'}")
         group_totals.append(("Developer caches", dev_freed))
         total_freed += dev_freed
+
+    if active_cats is None or "docker" in active_cats:
+        if shutil.which("docker") is not None:
+            try:
+                probe = subprocess.run(["docker", "info"], capture_output=True, timeout=10)
+                if probe.returncode == 0:
+                    click.echo(click.style("\nDocker", bold=True))
+                    if dry_run:
+                        result = subprocess.run(
+                            ["docker", "system", "df"], capture_output=True, text=True
+                        )
+                        click.echo(result.stdout.rstrip())
+                    else:
+                        result = subprocess.run(
+                            ["docker", "system", "prune", "-f"],
+                            capture_output=True, text=True,
+                        )
+                        for line in result.stdout.splitlines():
+                            if "Total reclaimed space" in line:
+                                click.echo(click.style(line, fg="green"))
+                            else:
+                                click.echo(line)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
 
     click.echo()
     verb = "would free" if dry_run else "freed"
