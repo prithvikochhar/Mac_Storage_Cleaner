@@ -185,7 +185,8 @@ def _run_dev_cache_clean(tool: str) -> int:
         "npm": ["npm", "cache", "clean", "--force"],
     }
     try:
-        r = subprocess.run(cmds[tool], capture_output=True, text=True, timeout=60)
+        timeout = 300 if tool == "uv" else 60
+        r = subprocess.run(cmds[tool], capture_output=True, text=True, timeout=timeout)
         if r.returncode == 0:
             click.echo(f"  {click.style('✓', fg='green')} {tool} cache cleaned")
             return size_before
