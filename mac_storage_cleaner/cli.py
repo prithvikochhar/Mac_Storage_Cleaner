@@ -115,7 +115,8 @@ def _delete(path: Path, dry_run: bool) -> bool:
 
 
 def _is_excluded(path: Path, excluded_names: set[str]) -> bool:
-    return any(part.lower() in excluded_names for part in path.parts)
+    path_lower = str(path).lower()
+    return any(name in path_lower for name in excluded_names)
 
 
 def _collect_clean_targets() -> list[tuple[str, list[Path]]]:
