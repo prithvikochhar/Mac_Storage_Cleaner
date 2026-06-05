@@ -37,6 +37,14 @@ def _app_cache_paths() -> list[Path]:
     ]
 
 
+def _conda_cache_paths() -> list[Path]:
+    candidates = [
+        HOME / "Library/Caches/conda",
+        HOME / ".conda/pkgs",
+    ]
+    return [p for p in candidates if p.exists()]
+
+
 def _log_paths() -> list[Path]:
     logs_root = HOME / "Library/Logs"
     if not logs_root.exists():
@@ -108,6 +116,7 @@ def _collect_clean_targets() -> list[tuple[str, list[Path]]]:
     return [
         ("Browser caches", _browser_cache_paths()),
         ("App caches (~/Library/Caches)", _app_cache_paths()),
+        ("Conda cache", _conda_cache_paths()),
         ("Log files (~/Library/Logs)", _log_paths()),
         ("Trash (~/.Trash)", [_trash_path()]),
     ]
