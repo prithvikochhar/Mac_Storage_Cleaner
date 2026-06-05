@@ -89,7 +89,23 @@ Output ends with a **How to clean these up:** guide.
 ```bash
 # Customize thresholds for Downloads/Documents
 mac-storage-cleaner find-large --min-size 200MB --days 60
+
+# Interactively delete items one by one
+mac-storage-cleaner find-large --interactive
+# or: mac-storage-cleaner find-large -i
 ```
+
+After showing the results table, `--interactive` prompts for each non-app item:
+
+```
+Delete ~/Downloads/old-backup.zip? [y/n/q(uit)]: 
+```
+
+- `y` deletes the item and prints how much was freed
+- `n` skips to the next item
+- `q` exits the interactive session without deleting remaining items
+- Items inside `/Applications` are always skipped with a reminder to use Finder
+- A summary is printed at the end: `Deleted X items, freed Y GB`
 
 ### View cleaning history
 
