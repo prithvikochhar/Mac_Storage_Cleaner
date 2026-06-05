@@ -2,7 +2,9 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import time
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
@@ -621,3 +623,96 @@ def clean_docker(dry_run: bool):
             click.echo(click.style(line, fg="green", bold=True))
         else:
             click.echo(line)
+
+
+# ---------------------------------------------------------------------------
+# Scheduler helpers
+# ---------------------------------------------------------------------------
+
+_PLIST_LABEL = "com.mac-storage-cleaner"
+_PLIST_PATH = Path.home() / "Library/LaunchAgents" / f"{_PLIST_LABEL}.plist"
+
+_PLIST_TEMPLATE = textwrap.dedent("""\
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+      "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+        <key>Label</key>
+        <string>{label}</string>
+        <key>ProgramArguments</key>
+        <array>
+            <string>/bin/sh</string>
+            <string>-c</string>
+            <string>{cmd} clean --dry-run &amp;&amp; osascript -e 'display notification "Monthly scan complete. Run mac-storage-cleaner history to see results." with title "Mac Storage Cleaner"'</string>
+        </array>
+        <key>StartCalendarInterval</key>
+        <dict>
+            <key>Day</key>
+            <integer>1</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <key>StandardOutPath</key>
+        <string>/tmp/mac-storage-cleaner.log</string>
+        <key>StandardErrorPath</key>
+        <string>/tmp/mac-storage-cleaner.err</string>
+    </dict>
+    </plist>
+""")
+
+
+# ---------------------------------------------------------------------------
+# schedule / unschedule commands
+# ---------------------------------------------------------------------------
+
+@main.command()
+@click.option("--status", is_flag=True, default=False,
+              help="Show whether the scheduler is currently installed.")
+def schedule(status: bool):
+    """Install a monthly launchd job to scan for large files and notify you."""
+    if status:
+        if _PLIST_PATH.exists():
+            click.echo(click.style("Scheduler is installed.", fg="green"))
+            click.echo(f"  Plist: {_PLIST_PATH}")
+            click.echo("  Schedule: 1st of each month at 9:00 AM")
+        else:
+            click.echo("Scheduler is not installed. Run `mac-storage-cleaner schedule` to set it up.")
+        return
+
+    cmd = shutil.which("mac-storage-cleaner") or sys.argv[0]
+    _PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _PLIST_PATH.write_text(_PLIST_TEMPLATE.format(label=_PLIST_LABEL, cmd=cmd))
+
+    result = subprocess.run(
+        ["launchctl", "load", str(_PLIST_PATH)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        click.echo(click.style(
+            f"Plist written but launchctl load failed:\n{result.stderr.strip()}",
+            fg="red",
+        ), err=True)
+        return
+
+    click.echo(
+        "Scheduler installed. "
+        "Mac Storage Cleaner will run a monthly scan on the 1st of each month at 9am."
+    )
+
+
+@main.command()
+def unschedule():
+    """Remove the monthly launchd job."""
+    if not _PLIST_PATH.exists():
+        click.echo("Scheduler is not installed.")
+        return
+
+    subprocess.run(
+        ["launchctl", "unload", str(_PLIST_PATH)],
+        capture_output=True, text=True,
+    )
+    _PLIST_PATH.unlink(missing_ok=True)
+    click.echo("Scheduler removed.")
