@@ -186,18 +186,26 @@ def _run_dev_cache_clean(tool: str) -> int:
     }
     try:
         timeout = 300 if tool == "uv" else 60
-        r = subprocess.run(cmds[tool], capture_output=True, text=True, timeout=timeout)
+        if tool == "uv":
+            # uv can print 17000+ file paths; capturing that output deadlocks the pipe
+            # buffer, so let it write directly to the terminal instead.
+            r = subprocess.run(cmds[tool], stdout=None, stderr=None, timeout=timeout)
+        else:
+            r = subprocess.run(cmds[tool], capture_output=True, text=True, timeout=timeout)
         if r.returncode == 0:
             click.echo(f"  {click.style('✓', fg='green')} {tool} cache cleaned")
             return size_before
-        err_output = r.stderr.strip()
-        if tool == "npm" and ("EACCES" in err_output or "root-owned files" in err_output):
-            click.echo(click.style(
-                "  ⚠ npm cache has a permissions issue. Fix it with: sudo chown -R $(id -u):$(id -g) ~/.npm",
-                fg="yellow",
-            ))
+        if tool == "uv":
+            click.echo(click.style(f"  ! {tool} cache clean failed", fg="red"), err=True)
         else:
-            click.echo(click.style(f"  ! {tool} cache clean failed: {err_output}", fg="red"), err=True)
+            err_output = r.stderr.strip()
+            if tool == "npm" and ("EACCES" in err_output or "root-owned files" in err_output):
+                click.echo(click.style(
+                    "  ⚠ npm cache has a permissions issue. Fix it with: sudo chown -R $(id -u):$(id -g) ~/.npm",
+                    fg="yellow",
+                ))
+            else:
+                click.echo(click.style(f"  ! {tool} cache clean failed: {err_output}", fg="red"), err=True)
     except (subprocess.TimeoutExpired, OSError) as e:
         click.echo(click.style(f"  ! Could not clean {tool} cache: {e}", fg="red"), err=True)
     return 0
