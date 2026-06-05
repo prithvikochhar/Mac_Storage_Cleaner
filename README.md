@@ -4,11 +4,13 @@ A fast, safe macOS CLI tool to reclaim disk space by removing known junk files a
 
 ## Features
 
-- **`clean`** — deletes browser caches (Chrome, Firefox, Safari), app caches in `~/Library/Caches`, conda package caches, and log files in `~/Library/Logs`; prompts for confirmation before deleting (bypass with `--yes`)
+- **`clean`** — deletes browser caches (Chrome, Firefox, Safari), app caches in `~/Library/Caches`, conda package caches, log files in `~/Library/Logs`, and developer caches (pip, uv, npm); prompts for confirmation before deleting (bypass with `--yes`)
 - **`--dry-run`** flag — shows exactly what *would* be deleted and how much space would be freed, without touching anything
 - **`scan`** — finds files and folders larger than a configurable size that haven't been accessed in over 90 days (configurable), printing them as warnings
-- **`find-large`** — scans `~/Downloads`, `~/Documents`, and `/Applications` for large, unused items and prints a sorted table with size, last-accessed date, and path
+- **`find-large`** — scans `~/Downloads`, `~/Documents`, and `/Applications` for large, unused items; shows type (App, ZIP archive, Folder, Video, Image, Document, or File) with context-specific cleanup tips
 - **`clean-docker`** — removes unused Docker containers, images, volumes, and build cache via `docker system prune`
+- **`history`** — displays a table of past cleaning runs with totals and per-category breakdown
+- **`schedule`** / **`unschedule`** — installs or removes a monthly launchd job that runs a dry-run scan on the 1st of each month at 9am and sends a macOS notification
 
 ## Requirements
 
@@ -77,10 +79,41 @@ This scans:
 - `~/Downloads` and `~/Documents` — items >100 MB not accessed in 30+ days
 - `/Applications` — apps >500 MB not opened in 180+ days
 
+Each result shows its **type** (App, ZIP archive, Folder, Video, Image, Document, or File) with a context-specific note:
+- ZIP archives are flagged as likely safe to delete
+- Apps remind you to drag to Trash in Finder (not just delete)
+- Old folders in Downloads prompt you to inspect before deleting
+
+Output ends with a **How to clean these up:** guide.
+
 ```bash
 # Customize thresholds for Downloads/Documents
 mac-storage-cleaner find-large --min-size 200MB --days 60
 ```
+
+### View cleaning history
+
+```bash
+mac-storage-cleaner history
+```
+
+Displays a table of every past `clean` run with timestamp, total freed, and per-category breakdown. The log is stored at `~/.mac-storage-cleaner/history.log`.
+
+### Schedule monthly scans
+
+```bash
+# Install a launchd job: runs a dry-run scan on the 1st of each month at 9am
+# and sends a macOS notification when complete
+mac-storage-cleaner schedule
+
+# Check whether the scheduler is installed
+mac-storage-cleaner schedule --status
+
+# Remove the scheduler
+mac-storage-cleaner unschedule
+```
+
+The notification reads: *"Monthly scan complete. Run mac-storage-cleaner history to see results."*
 
 ### Clean up unused Docker data
 
@@ -102,6 +135,8 @@ mac-storage-cleaner clean --help
 mac-storage-cleaner scan --help
 mac-storage-cleaner find-large --help
 mac-storage-cleaner clean-docker --help
+mac-storage-cleaner history --help
+mac-storage-cleaner schedule --help
 ```
 
 ## What gets cleaned
@@ -114,6 +149,7 @@ mac-storage-cleaner clean-docker --help
 | App caches | All subdirectories of `~/Library/Caches` |
 | Conda cache | `~/Library/Caches/conda`, `~/.conda/pkgs` (only if present) |
 | Log files | All items in `~/Library/Logs` |
+| Developer caches | pip, uv, and npm caches (only for tools that are installed) |
 
 > **Tip:** Always run `--dry-run` first to preview what will be deleted.
 
