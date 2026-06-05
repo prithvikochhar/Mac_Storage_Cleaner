@@ -92,6 +92,8 @@ mac-storage-cleaner clean-docker --dry-run
 mac-storage-cleaner clean-docker
 ```
 
+Requires Docker to be installed and Docker Desktop to be running. If Docker is not installed the command prints a notice and exits cleanly.
+
 ### Help
 
 ```bash
