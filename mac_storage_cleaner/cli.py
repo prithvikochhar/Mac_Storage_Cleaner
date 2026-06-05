@@ -52,10 +52,6 @@ def _log_paths() -> list[Path]:
     return [p for p in logs_root.iterdir()]
 
 
-def _trash_path() -> Path:
-    return HOME / ".Trash"
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -109,6 +105,8 @@ def _delete(path: Path, dry_run: bool) -> bool:
         return True
     except (PermissionError, OSError) as e:
         click.echo(click.style(f"  ! Could not delete {path}: {e}", fg="red"), err=True)
+        if "Chrome" in str(path) and "Directory not empty" in str(e):
+            click.echo(click.style("    → Close Chrome and try again.", fg="yellow"), err=True)
         return False
 
 
@@ -118,7 +116,6 @@ def _collect_clean_targets() -> list[tuple[str, list[Path]]]:
         ("App caches (~/Library/Caches)", _app_cache_paths()),
         ("Conda cache", _conda_cache_paths()),
         ("Log files (~/Library/Logs)", _log_paths()),
-        ("Trash (~/.Trash)", [_trash_path()]),
     ]
 
 
@@ -137,7 +134,7 @@ def main():
 @click.option("--yes", "-y", is_flag=True, default=False,
               help="Skip the confirmation prompt.")
 def clean(dry_run: bool, yes: bool):
-    """Delete browser caches, app caches, logs, and Trash."""
+    """Delete browser caches, app caches, and logs."""
     if dry_run:
         click.echo(click.style("DRY RUN — nothing will be deleted.\n", fg="yellow", bold=True))
 
@@ -201,6 +198,10 @@ def clean(dry_run: bool, yes: bool):
     click.echo()
     verb = "would free" if dry_run else "freed"
     click.echo(click.style(f"Total {verb}: {_human_size(total_freed)}", bold=True))
+    click.echo(click.style(
+        "\nTip: To empty Trash, right-click the Trash icon in your Dock and select Empty Trash.",
+        fg="cyan",
+    ))
 
 
 @main.command()
