@@ -489,15 +489,19 @@ def scan(min_size: str, days: int, search_path: str):
         f"{'Size':>10}  {'Last Accessed':<22}  Path", bold=True
     ))
     click.echo("-" * 80)
+    now_ts = time.time()
     for path, size, atime in found:
-        age_days = int((time.time() - atime) / 86400)
+        age_days = int((now_ts - atime) / 86400)
         accessed_str = f"{age_days} days ago"
         label = str(path).replace(str(HOME), "~")
-        click.echo(
-            click.style(f"{_human_size(size):>10}", fg="yellow") +
-            f"  {accessed_str:<22}  " +
-            click.style(label, fg="red")
-        )
+        if age_days >= 365:
+            row_color: "str | None" = "red"
+        elif age_days >= 180:
+            row_color = "yellow"
+        else:
+            row_color = None
+        row = f"{_human_size(size):>10}  {accessed_str:<22}  {label}"
+        click.echo(click.style(row, fg=row_color) if row_color else row)
 
     click.echo()
     click.echo(click.style(
@@ -505,6 +509,11 @@ def scan(min_size: str, days: int, search_path: str):
         "Review before deleting — run `mac-storage-cleaner clean` to remove common junk.",
         fg="yellow", bold=True,
     ))
+    click.echo()
+    click.echo("Legend:")
+    click.echo("  " + click.style("Red    ", fg="red")    + "= not accessed in 365+ days")
+    click.echo("  " + click.style("Yellow ", fg="yellow") + "= not accessed in 180–364 days")
+    click.echo("  White  = not accessed in 90–179 days")
 
 
 def _parse_size(s: str) -> int | None:
