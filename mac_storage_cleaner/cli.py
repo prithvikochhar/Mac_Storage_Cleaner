@@ -331,6 +331,33 @@ def _scan_recursive(
 _APPS_MIN_BYTES = 500 * 1024 ** 2   # 500 MB
 _APPS_DAYS = 180
 
+_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".wmv", ".flv", ".webm"}
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".tiff", ".tif", ".heic", ".raw", ".bmp"}
+_DOC_EXTS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pages", ".numbers", ".key"}
+_ARCHIVE_SUFFIXES = (".zip", ".tar.gz", ".tar.bz2", ".tgz", ".rar", ".7z", ".tar.xz")
+
+
+def _detect_type(path: Path) -> "tuple[str, str | None]":
+    name = path.name.lower()
+    if name.endswith(".app"):
+        return "App", "(drag to Trash in Finder to uninstall properly)"
+    if any(name.endswith(s) for s in _ARCHIVE_SUFFIXES):
+        return "ZIP archive", "(likely already extracted — safe to delete)"
+    if path.is_dir():
+        try:
+            path.relative_to(HOME / "Downloads")
+            return "Folder", "(open in Finder to inspect before deleting)"
+        except ValueError:
+            return "Folder", None
+    ext = path.suffix.lower()
+    if ext in _VIDEO_EXTS:
+        return "Video", None
+    if ext in _IMAGE_EXTS:
+        return "Image", None
+    if ext in _DOC_EXTS:
+        return "Document", None
+    return "File", None
+
 
 @main.command("find-large")
 @click.option("--min-size", default="100MB", show_default=True,
@@ -377,22 +404,27 @@ def find_large(min_size: str, days: int):
         return
 
     results.sort(key=lambda x: x[1], reverse=True)
-    click.echo(click.style(f"{'Size':>10}  {'Last Accessed':<22}  Path", bold=True))
-    click.echo("-" * 80)
+    click.echo(click.style(f"{'Size':>10}  {'Last Accessed':<16}  {'Type':<14}  Path", bold=True))
+    click.echo("-" * 90)
     for path, size, atime in results:
         age_days = int((now - atime) / 86400)
         label = str(path).replace(str(HOME), "~")
+        type_label, note = _detect_type(path)
         click.echo(
             click.style(f"{_human_size(size):>10}", fg="yellow") +
-            f"  {age_days} days ago{'':<13}  " +
+            f"  {f'{age_days} days ago':<16}  " +
+            click.style(f"{type_label:<14}", fg="cyan") +
+            "  " +
             click.style(label, fg="red")
         )
+        if note:
+            click.echo(f"            {click.style(note, fg='yellow')}")
 
     click.echo()
-    click.echo(
-        "These items have not been used recently. "
-        "Consider deleting them manually to free space."
-    )
+    click.echo(click.style("How to clean these up:", bold=True))
+    click.echo("  • Apps: drag them from /Applications to Trash, or use an uninstaller")
+    click.echo("  • ZIP files and old downloads: review in Finder, then delete if no longer needed")
+    click.echo("  • Large folders: open in Finder, inspect contents, then delete what you don't need")
 
 
 @main.command("clean-docker")
