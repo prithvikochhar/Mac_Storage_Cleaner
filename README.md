@@ -4,7 +4,7 @@ A fast, safe macOS CLI tool to reclaim disk space by removing known junk files a
 
 ## Features
 
-- **`clean`** — deletes browser caches (Chrome, Firefox, Safari), all app caches in `~/Library/Caches`, log files in `~/Library/Logs`, and Trash
+- **`clean`** — deletes browser caches (Chrome, Firefox, Safari), app caches in `~/Library/Caches`, conda package caches, log files in `~/Library/Logs`, and Trash; prompts for confirmation before deleting (bypass with `--yes`)
 - **`--dry-run`** flag — shows exactly what *would* be deleted and how much space would be freed, without touching anything
 - **`scan`** — finds files and folders larger than a configurable size that haven't been accessed in over 90 days (configurable), printing them as warnings
 
@@ -16,7 +16,13 @@ A fast, safe macOS CLI tool to reclaim disk space by removing known junk files a
 ## Installation
 
 ```bash
-# Install directly from the project directory
+# Install from GitHub
+uv tool install "git+https://github.com/prithvikochhar/Mac_Storage_Cleaner"
+```
+
+Or install from a local clone:
+
+```bash
 uv tool install .
 ```
 
@@ -38,6 +44,9 @@ mac-storage-cleaner clean --dry-run
 
 ```bash
 mac-storage-cleaner clean
+# You will be prompted to confirm before any files are deleted.
+# To skip the prompt (e.g. in scripts):
+mac-storage-cleaner clean --yes
 ```
 
 ### Find large stale files (default: >1 GB, not accessed in 90+ days)
@@ -72,6 +81,7 @@ mac-storage-cleaner scan --help
 | Firefox cache | `~/Library/Caches/Firefox` |
 | Safari cache | `~/Library/Caches/com.apple.Safari`, `~/Library/Safari/LocalStorage` |
 | App caches | All subdirectories of `~/Library/Caches` |
+| Conda cache | `~/Library/Caches/conda`, `~/.conda/pkgs` (only if present) |
 | Log files | All items in `~/Library/Logs` |
 | Trash | `~/.Trash` |
 
