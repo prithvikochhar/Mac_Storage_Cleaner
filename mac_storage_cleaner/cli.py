@@ -3,6 +3,7 @@ import shutil
 import stat
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -187,6 +188,32 @@ def _run_dev_cache_clean(tool: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# History helpers
+# ---------------------------------------------------------------------------
+
+def _history_log_path() -> Path:
+    return HOME / ".mac-storage-cleaner" / "history.log"
+
+
+def _history_group_name(name: str) -> str:
+    return name.split(" (")[0]
+
+
+def _append_history(total_freed: int, group_totals: "list[tuple[str, int]]") -> None:
+    log_path = _history_log_path()
+    log_path.parent.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    parts = ", ".join(
+        f"{_history_group_name(name)}: {_human_size(size)}"
+        for name, size in group_totals
+        if size > 0
+    )
+    line = f"[{timestamp}] Cleaned {_human_size(total_freed)} — {parts}\n"
+    with open(log_path, "a") as f:
+        f.write(line)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -244,6 +271,8 @@ def clean(dry_run: bool, yes: bool):
         click.echo()
 
     total_freed = 0
+    group_totals: list[tuple[str, int]] = []
+
     for group_name, paths in groups:
         click.echo(click.style(f"\n{group_name}", bold=True))
         group_freed = 0
@@ -266,6 +295,7 @@ def clean(dry_run: bool, yes: bool):
         if group_freed:
             click.echo(f"  → {_human_size(group_freed)} {'would be freed' if dry_run else 'freed'}")
 
+        group_totals.append((group_name, group_freed))
         total_freed += group_freed
 
     if dev_tools:
@@ -281,6 +311,7 @@ def clean(dry_run: bool, yes: bool):
                 dev_freed += _run_dev_cache_clean(tool)
         if dev_freed:
             click.echo(f"  → {_human_size(dev_freed)} {'would be freed' if dry_run else 'freed'}")
+        group_totals.append(("Developer caches", dev_freed))
         total_freed += dev_freed
 
     click.echo()
@@ -290,6 +321,39 @@ def clean(dry_run: bool, yes: bool):
         "\nTip: To empty Trash, right-click the Trash icon in your Dock and select Empty Trash.",
         fg="cyan",
     ))
+
+    if not dry_run and total_freed > 0:
+        _append_history(total_freed, group_totals)
+
+
+@main.command()
+def history():
+    """Show a table of past cleaning runs."""
+    log_path = _history_log_path()
+    if not log_path.exists():
+        click.echo("No cleaning history found. Run `mac-storage-cleaner clean` to get started.")
+        return
+
+    lines = [l for l in log_path.read_text().splitlines() if l.strip()]
+    if not lines:
+        click.echo("No cleaning history found. Run `mac-storage-cleaner clean` to get started.")
+        return
+
+    click.echo(click.style(f"{'Date & Time':<22}  {'Total Cleaned':<15}  Details", bold=True))
+    click.echo("-" * 100)
+    for line in lines:
+        if not line.startswith("["):
+            continue
+        try:
+            bracket_end = line.index("]")
+            timestamp = line[1:bracket_end]
+            rest = line[bracket_end + 2:]
+            parts = rest.split(" — ", 1)
+            total = parts[0].replace("Cleaned ", "")
+            details = parts[1] if len(parts) > 1 else ""
+            click.echo(f"{timestamp:<22}  {total:<15}  {details}")
+        except (ValueError, IndexError):
+            click.echo(line)
 
 
 @main.command()
