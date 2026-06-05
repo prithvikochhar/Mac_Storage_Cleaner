@@ -120,6 +120,72 @@ def _collect_clean_targets() -> list[tuple[str, list[Path]]]:
     ]
 
 
+def _available_dev_tools() -> list[str]:
+    return [t for t in ("pip", "uv", "npm") if shutil.which(t) is not None]
+
+
+def _dev_cache_dir(tool: str) -> "Path | None":
+    try:
+        if tool == "pip":
+            r = subprocess.run(["pip", "cache", "dir"], capture_output=True, text=True, timeout=10)
+        elif tool == "uv":
+            r = subprocess.run(["uv", "cache", "dir"], capture_output=True, text=True, timeout=10)
+        elif tool == "npm":
+            r = subprocess.run(["npm", "config", "get", "cache"], capture_output=True, text=True, timeout=10)
+        else:
+            return None
+        if r.returncode == 0:
+            return Path(r.stdout.strip())
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
+def _dev_cache_size(tool: str) -> int:
+    cache_dir = _dev_cache_dir(tool)
+    return _path_size(cache_dir) if cache_dir else 0
+
+
+def _show_dev_cache_info(tool: str) -> None:
+    try:
+        if tool == "pip":
+            r = subprocess.run(["pip", "cache", "info"], capture_output=True, text=True, timeout=15)
+            for line in r.stdout.splitlines():
+                click.echo(f"    {line}")
+        elif tool == "uv":
+            cache_dir = _dev_cache_dir("uv")
+            if cache_dir:
+                click.echo(f"    Cache directory: {cache_dir}")
+                click.echo(f"    Cache size:       {_human_size(_path_size(cache_dir))}")
+        elif tool == "npm":
+            r = subprocess.run(["npm", "cache", "verify"], capture_output=True, text=True, timeout=30)
+            output = r.stdout or r.stderr
+            for line in output.splitlines():
+                click.echo(f"    {line}")
+    except (subprocess.TimeoutExpired, OSError) as e:
+        click.echo(click.style(f"    ! Could not get {tool} cache info: {e}", fg="red"), err=True)
+
+
+def _run_dev_cache_clean(tool: str) -> int:
+    """Clean one dev tool's cache. Returns bytes freed (estimated as size before clean)."""
+    size_before = _dev_cache_size(tool)
+    click.echo(f"  {tool} cache: {_human_size(size_before)}")
+    cmds = {
+        "pip": ["pip", "cache", "purge"],
+        "uv": ["uv", "cache", "clean"],
+        "npm": ["npm", "cache", "clean", "--force"],
+    }
+    try:
+        r = subprocess.run(cmds[tool], capture_output=True, text=True, timeout=60)
+        if r.returncode == 0:
+            click.echo(f"  {click.style('✓', fg='green')} {tool} cache cleaned")
+            return size_before
+        click.echo(click.style(f"  ! {tool} cache clean failed: {r.stderr.strip()}", fg="red"), err=True)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        click.echo(click.style(f"  ! Could not clean {tool} cache: {e}", fg="red"), err=True)
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -135,11 +201,12 @@ def main():
 @click.option("--yes", "-y", is_flag=True, default=False,
               help="Skip the confirmation prompt.")
 def clean(dry_run: bool, yes: bool):
-    """Delete browser caches, app caches, and logs."""
+    """Delete browser caches, app caches, logs, and developer caches."""
     if dry_run:
         click.echo(click.style("DRY RUN — nothing will be deleted.\n", fg="yellow", bold=True))
 
     groups = _collect_clean_targets()
+    dev_tools = _available_dev_tools()
 
     if not dry_run:
         # Compute sizes and print a summary before asking for confirmation
@@ -148,6 +215,11 @@ def clean(dry_run: bool, yes: bool):
             group_size = sum(_path_size(p) for p in paths if p.exists())
             if group_size:
                 summary.append((group_name, group_size))
+
+        for tool in dev_tools:
+            size = _dev_cache_size(tool)
+            if size:
+                summary.append((f"Developer caches ({tool})", size))
 
         if not summary:
             click.echo("Nothing to clean.")
@@ -195,6 +267,21 @@ def clean(dry_run: bool, yes: bool):
             click.echo(f"  → {_human_size(group_freed)} {'would be freed' if dry_run else 'freed'}")
 
         total_freed += group_freed
+
+    if dev_tools:
+        click.echo(click.style("\nDeveloper caches", bold=True))
+        dev_freed = 0
+        for tool in dev_tools:
+            if dry_run:
+                size = _dev_cache_size(tool)
+                click.echo(f"\n  {tool} cache ({_human_size(size)}):")
+                _show_dev_cache_info(tool)
+                dev_freed += size
+            else:
+                dev_freed += _run_dev_cache_clean(tool)
+        if dev_freed:
+            click.echo(f"  → {_human_size(dev_freed)} {'would be freed' if dry_run else 'freed'}")
+        total_freed += dev_freed
 
     click.echo()
     verb = "would free" if dry_run else "freed"
