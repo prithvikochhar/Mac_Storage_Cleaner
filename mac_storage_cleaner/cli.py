@@ -114,6 +114,10 @@ def _delete(path: Path, dry_run: bool) -> bool:
         return False
 
 
+def _is_excluded(path: Path, excluded_names: set[str]) -> bool:
+    return any(part.lower() in excluded_names for part in path.parts)
+
+
 def _collect_clean_targets() -> list[tuple[str, list[Path]]]:
     return [
         ("Browser caches", _browser_cache_paths()),
@@ -265,8 +269,15 @@ def main():
 @click.option("--categories", default=None,
               help="Comma-separated list of categories to clean: "
                    "caches, logs, conda, developer, docker. Defaults to all.")
-def clean(dry_run: bool, yes: bool, categories: "str | None"):
+@click.option("--exclude", default=None,
+              help="Comma-separated list of folder/app names to skip, "
+                   "e.g. --exclude Spotify,Chrome (case-insensitive).")
+def clean(dry_run: bool, yes: bool, categories: "str | None", exclude: "str | None"):
     """Delete browser caches, app caches, logs, and developer caches."""
+    excluded_names: set[str] = set()
+    if exclude:
+        excluded_names = {e.strip().lower() for e in exclude.split(",")}
+
     active_cats: "set[str] | None" = None
     if categories:
         active_cats = {c.strip().lower() for c in categories.split(",")}
@@ -339,6 +350,10 @@ def clean(dry_run: bool, yes: bool, categories: "str | None"):
         for path in paths:
             if not path.exists():
                 continue
+            if excluded_names and _is_excluded(path, excluded_names):
+                label = "  " + str(path).replace(str(HOME), "~")
+                click.echo(click.style(f"  {label}  skipped (excluded)", fg="yellow"))
+                continue
             size = _path_size(path)
             label = "  " + str(path).replace(str(HOME), "~")
             size_str = _human_size(size)
@@ -361,6 +376,9 @@ def clean(dry_run: bool, yes: bool, categories: "str | None"):
         click.echo(click.style("\nDeveloper caches", bold=True))
         dev_freed = 0
         for tool in dev_tools:
+            if excluded_names and tool.lower() in excluded_names:
+                click.echo(click.style(f"  {tool} cache  skipped (excluded)", fg="yellow"))
+                continue
             if dry_run:
                 size = _dev_cache_size(tool)
                 click.echo(f"\n  {tool} cache ({_human_size(size)}):")
