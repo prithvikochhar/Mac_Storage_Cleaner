@@ -4,9 +4,11 @@ A fast, safe macOS CLI tool to reclaim disk space by removing known junk files a
 
 ## Features
 
-- **`clean`** — deletes browser caches (Chrome, Firefox, Safari), app caches in `~/Library/Caches`, conda package caches, log files in `~/Library/Logs`, and Trash; prompts for confirmation before deleting (bypass with `--yes`)
+- **`clean`** — deletes browser caches (Chrome, Firefox, Safari), app caches in `~/Library/Caches`, conda package caches, and log files in `~/Library/Logs`; prompts for confirmation before deleting (bypass with `--yes`)
 - **`--dry-run`** flag — shows exactly what *would* be deleted and how much space would be freed, without touching anything
 - **`scan`** — finds files and folders larger than a configurable size that haven't been accessed in over 90 days (configurable), printing them as warnings
+- **`find-large`** — scans `~/Downloads`, `~/Documents`, and `/Applications` for large, unused items and prints a sorted table with size, last-accessed date, and path
+- **`clean-docker`** — removes unused Docker containers, images, volumes, and build cache via `docker system prune`
 
 ## Requirements
 
@@ -65,12 +67,39 @@ mac-storage-cleaner scan --min-size 500MB --days 60
 mac-storage-cleaner scan --path ~/Downloads --min-size 100MB
 ```
 
+### Find large unused items in Downloads, Documents, and Applications
+
+```bash
+mac-storage-cleaner find-large
+```
+
+This scans:
+- `~/Downloads` and `~/Documents` — items >100 MB not accessed in 30+ days
+- `/Applications` — apps >500 MB not opened in 180+ days
+
+```bash
+# Customize thresholds for Downloads/Documents
+mac-storage-cleaner find-large --min-size 200MB --days 60
+```
+
+### Clean up unused Docker data
+
+```bash
+# See what would be freed (no deletions)
+mac-storage-cleaner clean-docker --dry-run
+
+# Actually prune unused Docker data
+mac-storage-cleaner clean-docker
+```
+
 ### Help
 
 ```bash
 mac-storage-cleaner --help
 mac-storage-cleaner clean --help
 mac-storage-cleaner scan --help
+mac-storage-cleaner find-large --help
+mac-storage-cleaner clean-docker --help
 ```
 
 ## What gets cleaned
@@ -83,7 +112,6 @@ mac-storage-cleaner scan --help
 | App caches | All subdirectories of `~/Library/Caches` |
 | Conda cache | `~/Library/Caches/conda`, `~/.conda/pkgs` (only if present) |
 | Log files | All items in `~/Library/Logs` |
-| Trash | `~/.Trash` |
 
 > **Note:** Always run `--dry-run` first to review what will be deleted. The `clean` command permanently removes files; there is no undo.
 
