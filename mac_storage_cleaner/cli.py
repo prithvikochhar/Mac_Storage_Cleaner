@@ -539,7 +539,9 @@ def _detect_type(path: Path) -> "tuple[str, str | None]":
               help="Minimum size for items in Downloads/Documents.")
 @click.option("--days", default=30, show_default=True,
               help="Flag items in Downloads/Documents not accessed in this many days.")
-def find_large(min_size: str, days: int):
+@click.option("--interactive", "-i", is_flag=True, default=False,
+              help="Interactively prompt to delete each found item one by one.")
+def find_large(min_size: str, days: int, interactive: bool):
     """Find large, unused files in Downloads, Documents, and Applications."""
     min_bytes = _parse_size(min_size)
     if min_bytes is None:
@@ -600,6 +602,52 @@ def find_large(min_size: str, days: int):
     click.echo("  • Apps: drag them from /Applications to Trash, or use an uninstaller")
     click.echo("  • ZIP files and old downloads: review in Finder, then delete if no longer needed")
     click.echo("  • Large folders: open in Finder, inspect contents, then delete what you don't need")
+
+    if not interactive:
+        return
+
+    click.echo()
+    click.echo(click.style("Interactive deletion — press q to quit at any time.", bold=True))
+    deleted_count = 0
+    deleted_bytes = 0
+    for path, size, atime in results:
+        label = str(path).replace(str(HOME), "~")
+        if str(path).startswith("/Applications"):
+            click.echo(f"  {label}: Use Finder to uninstall apps properly.")
+            continue
+        while True:
+            try:
+                ans = click.prompt(
+                    f"Delete {label}? [y/n/q(uit)]",
+                    default="",
+                    show_default=False,
+                    prompt_suffix=": ",
+                ).strip().lower() or "n"
+            except (click.exceptions.Abort, EOFError):
+                ans = "q"
+            if ans in ("y", "n", "q"):
+                break
+            click.echo("  Please enter y, n, or q.")
+        if ans == "q":
+            click.echo("Quitting interactive session.")
+            break
+        if ans == "y":
+            try:
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
+                click.echo(click.style(f"  Deleted. Freed {_human_size(size)}.", fg="green"))
+                deleted_count += 1
+                deleted_bytes += size
+            except (PermissionError, OSError) as e:
+                click.echo(click.style(f"  ! Could not delete {path}: {e}", fg="red"), err=True)
+
+    click.echo()
+    click.echo(click.style(
+        f"Deleted {deleted_count} items, freed {_human_size(deleted_bytes)}",
+        bold=True,
+    ))
 
 
 @main.command("clean-docker")
