@@ -20,7 +20,6 @@ def _browser_cache_paths() -> list[Path]:
         HOME / "Library/Application Support/Google/Chrome/Default/Cache",
         HOME / "Library/Application Support/Google/Chrome/Default/Code Cache",
         HOME / "Library/Caches/Firefox",
-        HOME / "Library/Application Support/Firefox/Profiles",
         HOME / "Library/Safari/LocalStorage",
         HOME / "Library/Caches/com.apple.Safari",
     ]
