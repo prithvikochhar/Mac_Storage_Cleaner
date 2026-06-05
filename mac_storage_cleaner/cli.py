@@ -253,6 +253,8 @@ def main():
               help="Skip the confirmation prompt.")
 def clean(dry_run: bool, yes: bool):
     """Delete browser caches, app caches, logs, and developer caches."""
+    free_before = shutil.disk_usage("/").free
+
     if dry_run:
         click.echo(click.style("DRY RUN — nothing will be deleted.\n", fg="yellow", bold=True))
 
@@ -341,6 +343,23 @@ def clean(dry_run: bool, yes: bool):
     click.echo()
     verb = "would free" if dry_run else "freed"
     click.echo(click.style(f"Total {verb}: {_human_size(total_freed)}", bold=True))
+
+    if dry_run:
+        free_after_est = free_before + total_freed
+        click.echo(click.style(
+            f"Free space: {_human_size(free_before)} → ~{_human_size(free_after_est)} "
+            f"(estimated freed {_human_size(total_freed)})",
+            fg="green",
+        ))
+    else:
+        free_after = shutil.disk_usage("/").free
+        freed_actual = max(0, free_after - free_before)
+        click.echo(click.style(
+            f"Free space: {_human_size(free_before)} → {_human_size(free_after)} "
+            f"(freed {_human_size(freed_actual)})",
+            fg="green",
+        ))
+
     click.echo(click.style(
         "\nTip: To empty Trash, right-click the Trash icon in your Dock and select Empty Trash.",
         fg="cyan",

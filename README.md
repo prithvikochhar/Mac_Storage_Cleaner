@@ -53,6 +53,14 @@ mac-storage-cleaner clean
 mac-storage-cleaner clean --yes
 ```
 
+After cleaning, a disk space summary is always printed (both dry-run and real runs):
+
+```
+Free space: 45.2 GB → 52.7 GB (freed 7.5 GB)
+```
+
+For dry-run, the estimated free space after is shown instead.
+
 ### Find large stale files (default: >1 GB, not accessed in 90+ days)
 
 ```bash
