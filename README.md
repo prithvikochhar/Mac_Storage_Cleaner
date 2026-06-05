@@ -78,6 +78,18 @@ Available categories: `caches`, `logs`, `conda`, `developer`, `docker`.
 If `--categories` is not specified, all categories except `docker` are cleaned (default behaviour unchanged).  
 A note is printed at the top showing which categories are active.
 
+### Exclude specific apps or cache folders from clean
+
+```bash
+# Skip Spotify and Chrome caches
+mac-storage-cleaner clean --exclude Spotify,Chrome
+
+# Combine with other flags
+mac-storage-cleaner clean --dry-run --exclude npm,pip
+```
+
+Matching is case-insensitive against any component of the path. Skipped items are shown in yellow with a `skipped (excluded)` note.
+
 ### Find large stale files (default: >1 GB, not accessed in 90+ days)
 
 ```bash
