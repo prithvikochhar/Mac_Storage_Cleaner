@@ -181,7 +181,7 @@ def _run_dev_cache_clean(tool: str) -> int:
     click.echo(f"  {tool} cache: {_human_size(size_before)}")
     cmds = {
         "pip": ["pip", "cache", "purge"],
-        "uv": ["uv", "cache", "clean"],
+        "uv": ["uv", "cache", "clean", "--force"],
         "npm": ["npm", "cache", "clean", "--force"],
     }
     try:
