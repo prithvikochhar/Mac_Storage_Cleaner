@@ -1,0 +1,21 @@
+[project]
+name = "mac-storage-cleaner"
+version = "0.1.0"
+description = "A CLI tool to safely clean junk files and find large stale items on macOS"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.4.1",
+]
+
+[project.scripts]
+mac-storage-cleaner = "mac_storage_cleaner.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "hatchling>=1.30.1",
+]
