@@ -134,14 +134,46 @@ def main():
 @main.command()
 @click.option("--dry-run", is_flag=True, default=False,
               help="Show what would be deleted without actually deleting anything.")
-def clean(dry_run: bool):
+@click.option("--yes", "-y", is_flag=True, default=False,
+              help="Skip the confirmation prompt.")
+def clean(dry_run: bool, yes: bool):
     """Delete browser caches, app caches, logs, and Trash."""
     if dry_run:
         click.echo(click.style("DRY RUN — nothing will be deleted.\n", fg="yellow", bold=True))
 
-    total_freed = 0
     groups = _collect_clean_targets()
 
+    if not dry_run:
+        # Compute sizes and print a summary before asking for confirmation
+        summary: list[tuple[str, int]] = []
+        for group_name, paths in groups:
+            group_size = sum(_path_size(p) for p in paths if p.exists())
+            if group_size:
+                summary.append((group_name, group_size))
+
+        if not summary:
+            click.echo("Nothing to clean.")
+            return
+
+        click.echo(click.style("The following will be permanently deleted:", bold=True))
+        total_preview = 0
+        for group_name, size in summary:
+            click.echo(f"  {group_name:<40} {_human_size(size):>10}")
+            total_preview += size
+        click.echo(f"\n  {'Total':<40} {_human_size(total_preview):>10}")
+
+        if not yes:
+            click.echo()
+            confirmed = click.confirm(
+                "Are you sure you want to permanently delete these files?",
+                default=False,
+            )
+            if not confirmed:
+                click.echo("Aborted.")
+                return
+        click.echo()
+
+    total_freed = 0
     for group_name, paths in groups:
         click.echo(click.style(f"\n{group_name}", bold=True))
         group_freed = 0
