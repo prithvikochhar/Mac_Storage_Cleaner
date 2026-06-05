@@ -115,7 +115,7 @@ mac-storage-cleaner clean-docker --help
 | Conda cache | `~/Library/Caches/conda`, `~/.conda/pkgs` (only if present) |
 | Log files | All items in `~/Library/Logs` |
 
-> **Note:** Always run `--dry-run` first to review what will be deleted. The `clean` command permanently removes files; there is no undo.
+> **Tip:** Always run `--dry-run` first to preview what will be deleted.
 
 ## Development
 
