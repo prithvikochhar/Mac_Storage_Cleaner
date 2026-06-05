@@ -556,6 +556,9 @@ _SKIP_DIRS = {
     "System",
     "private",
     "cores",
+    "Library",      # ~/Library — system/app data, too broad and confusing
+    "miniforge3",   # ~/miniforge3 — conda base env, large but intentional
+    "node_modules", # ~/node_modules — global npm packages
 }
 
 _SKIP_NAMES = {"node_modules", ".git", "__pycache__", ".venv", "venv"}
@@ -581,7 +584,7 @@ def _scan_recursive(
 
         if entry.name.startswith(".") and depth > 0:
             continue
-        if entry.name in _SKIP_NAMES:
+        if entry.name in _SKIP_NAMES or entry.name in _SKIP_DIRS:
             continue
 
         try:
