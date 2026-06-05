@@ -393,3 +393,48 @@ def find_large(min_size: str, days: int):
         "These items have not been used recently. "
         "Consider deleting them manually to free space."
     )
+
+
+@main.command("clean-docker")
+@click.option("--dry-run", is_flag=True, default=False,
+              help="Show Docker disk usage without removing anything.")
+def clean_docker(dry_run: bool):
+    """Remove unused Docker containers, images, volumes, and build cache."""
+    if shutil.which("docker") is None:
+        click.echo("Docker is not installed, skipping.")
+        return
+
+    try:
+        probe = subprocess.run(
+            ["docker", "info"],
+            capture_output=True, timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        click.echo("Docker is not running. Start Docker Desktop and try again.")
+        return
+
+    if probe.returncode != 0:
+        click.echo("Docker is not running. Start Docker Desktop and try again.")
+        return
+
+    if dry_run:
+        click.echo(click.style("DRY RUN — Docker disk usage:\n", fg="yellow", bold=True))
+        result = subprocess.run(["docker", "system", "df"], capture_output=True, text=True)
+        click.echo(result.stdout)
+        return
+
+    click.echo(click.style("Pruning unused Docker data...\n", bold=True))
+    result = subprocess.run(
+        ["docker", "system", "prune", "-f"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        click.echo(click.style(f"docker system prune failed:\n{result.stderr}", fg="red"), err=True)
+        return
+
+    lines = result.stdout.splitlines()
+    for line in lines:
+        if "Total reclaimed space" in line:
+            click.echo(click.style(line, fg="green", bold=True))
+        else:
+            click.echo(line)
