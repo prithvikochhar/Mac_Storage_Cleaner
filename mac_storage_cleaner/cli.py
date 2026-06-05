@@ -163,8 +163,14 @@ def _show_dev_cache_info(tool: str) -> None:
         elif tool == "npm":
             r = subprocess.run(["npm", "cache", "verify"], capture_output=True, text=True, timeout=30)
             output = r.stdout or r.stderr
-            for line in output.splitlines():
-                click.echo(f"    {line}")
+            if "EACCES" in output or "root-owned files" in output:
+                click.echo(click.style(
+                    "  ⚠ npm cache has a permissions issue. Fix it with: sudo chown -R $(id -u):$(id -g) ~/.npm",
+                    fg="yellow",
+                ))
+            else:
+                for line in output.splitlines():
+                    click.echo(f"    {line}")
     except (subprocess.TimeoutExpired, OSError) as e:
         click.echo(click.style(f"    ! Could not get {tool} cache info: {e}", fg="red"), err=True)
 
@@ -183,7 +189,14 @@ def _run_dev_cache_clean(tool: str) -> int:
         if r.returncode == 0:
             click.echo(f"  {click.style('✓', fg='green')} {tool} cache cleaned")
             return size_before
-        click.echo(click.style(f"  ! {tool} cache clean failed: {r.stderr.strip()}", fg="red"), err=True)
+        err_output = r.stderr.strip()
+        if tool == "npm" and ("EACCES" in err_output or "root-owned files" in err_output):
+            click.echo(click.style(
+                "  ⚠ npm cache has a permissions issue. Fix it with: sudo chown -R $(id -u):$(id -g) ~/.npm",
+                fg="yellow",
+            ))
+        else:
+            click.echo(click.style(f"  ! {tool} cache clean failed: {err_output}", fg="red"), err=True)
     except (subprocess.TimeoutExpired, OSError) as e:
         click.echo(click.style(f"  ! Could not clean {tool} cache: {e}", fg="red"), err=True)
     return 0
