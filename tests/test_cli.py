@@ -5,10 +5,12 @@ import pytest
 from click.testing import CliRunner
 
 from mac_storage_cleaner.cli import (
+    _app_cache_paths,
     _detect_type,
     _human_size,
     _is_excluded,
     _parse_size,
+    _path_size,
     main,
 )
 
@@ -127,6 +129,39 @@ def test_scan_invalid_size_exits_nonzero():
 # ---------------------------------------------------------------------------
 # clean --dry-run on a tmp directory
 # ---------------------------------------------------------------------------
+
+def test_app_cache_no_double_count(tmp_path):
+    """_app_cache_paths must not include a dir that is an ancestor of a browser path."""
+    # Replicate the Google/Chrome overlap: Google is parent of Google/Chrome
+    caches = tmp_path / "Library" / "Caches"
+    chrome_dir = caches / "Google" / "Chrome"
+    chrome_dir.mkdir(parents=True)
+    (chrome_dir / "cache.bin").write_bytes(b"x" * 4096)
+
+    other_dir = caches / "Spotify"
+    other_dir.mkdir()
+    (other_dir / "data.bin").write_bytes(b"x" * 2048)
+
+    google_dir = caches / "Google"
+    chrome_size = _path_size(chrome_dir)
+    spotify_size = _path_size(other_dir)
+    google_size = _path_size(google_dir)
+    assert google_size == chrome_size  # Google only contains Chrome in this test
+
+    with (
+        patch("mac_storage_cleaner.cli.HOME", tmp_path),
+        patch("mac_storage_cleaner.cli._browser_cache_paths", return_value=[chrome_dir]),
+    ):
+        app_paths = _app_cache_paths()
+
+    # Google (ancestor of browser path) must be excluded; Spotify must remain
+    assert google_dir not in app_paths
+    assert other_dir in app_paths
+
+    # Total across browser + app groups must not double-count Chrome's bytes
+    total = _path_size(chrome_dir) + sum(_path_size(p) for p in app_paths)
+    assert total == chrome_size + spotify_size
+
 
 def test_clean_dry_run(tmp_path):
     cache_dir = tmp_path / "fake_cache"

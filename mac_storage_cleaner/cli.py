@@ -33,12 +33,31 @@ def _app_cache_paths() -> list[Path]:
     cache_root = HOME / "Library/Caches"
     if not cache_root.exists():
         return []
-    # Exclude system-critical caches; target per-app directories only
     excluded = {"com.apple.Safari"}
-    return [
-        p for p in cache_root.iterdir()
-        if p.is_dir() and p.name not in excluded
-    ]
+    browser_paths = set(_browser_cache_paths())
+    result = []
+    for p in cache_root.iterdir():
+        if not p.is_dir() or p.name in excluded:
+            continue
+        # Skip dirs that would double-count with a browser path:
+        # either p is an ancestor of a browser path, or p is inside one.
+        overlaps = False
+        for bp in browser_paths:
+            try:
+                bp.relative_to(p)   # p is ancestor of bp
+                overlaps = True
+                break
+            except ValueError:
+                pass
+            try:
+                p.relative_to(bp)   # p is inside bp
+                overlaps = True
+                break
+            except ValueError:
+                pass
+        if not overlaps:
+            result.append(p)
+    return result
 
 
 def _conda_cache_paths() -> list[Path]:
