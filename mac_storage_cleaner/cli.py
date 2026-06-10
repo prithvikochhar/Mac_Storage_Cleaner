@@ -756,9 +756,9 @@ def find_large(min_size: str, days: int, interactive: bool):
         return
 
     click.echo()
-    click.echo(click.style("Interactive deletion — press q to quit at any time.", bold=True))
-    deleted_count = 0
-    deleted_bytes = 0
+    click.echo(click.style("Interactive mode — press q to quit at any time.", bold=True))
+    trashed_count = 0
+    trashed_bytes = 0
     for path, size, atime in results:
         label = str(path).replace(str(HOME), "~")
         if str(path).startswith("/Applications"):
@@ -767,7 +767,7 @@ def find_large(min_size: str, days: int, interactive: bool):
         while True:
             try:
                 ans = click.prompt(
-                    f"Delete {label}? [y/n/q(uit)]",
+                    f"Move to Trash? {label} [y/n/q(uit)]",
                     default="",
                     show_default=False,
                     prompt_suffix=": ",
@@ -782,19 +782,28 @@ def find_large(min_size: str, days: int, interactive: bool):
             break
         if ans == "y":
             try:
-                if path.is_dir():
-                    shutil.rmtree(path)
+                result = subprocess.run(
+                    ["osascript", "-e",
+                     f'tell application "Finder" to delete POSIX file "{path.resolve()}"'],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if result.returncode == 0:
+                    click.echo(click.style(
+                        f"  Moved to Trash. (~{_human_size(size)} reclaimable after emptying Trash)",
+                        fg="green",
+                    ))
+                    trashed_count += 1
+                    trashed_bytes += size
                 else:
-                    path.unlink()
-                click.echo(click.style(f"  Deleted. Freed {_human_size(size)}.", fg="green"))
-                deleted_count += 1
-                deleted_bytes += size
-            except (PermissionError, OSError) as e:
-                click.echo(click.style(f"  ! Could not delete {path}: {e}", fg="red"), err=True)
+                    click.echo(click.style(
+                        f"  ! Could not move to Trash: {result.stderr.strip()}", fg="red",
+                    ), err=True)
+            except (subprocess.TimeoutExpired, OSError) as e:
+                click.echo(click.style(f"  ! Could not move to Trash: {e}", fg="red"), err=True)
 
     click.echo()
     click.echo(click.style(
-        f"Deleted {deleted_count} items, freed {_human_size(deleted_bytes)}",
+        f"Moved {trashed_count} items to Trash (~{_human_size(trashed_bytes)} reclaimable after emptying Trash)",
         bold=True,
     ))
 

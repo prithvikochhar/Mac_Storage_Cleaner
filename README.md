@@ -135,14 +135,16 @@ mac-storage-cleaner find-large --interactive
 After showing the results table, `--interactive` prompts for each non-app item:
 
 ```
-Delete ~/Downloads/old-backup.zip? [y/n/q(uit)]: 
+Move to Trash? ~/Downloads/old-backup.zip [y/n/q(uit)]: 
 ```
 
-- `y` deletes the item and prints how much was freed
+- `y` moves the item to Trash (recoverable by emptying Trash in Finder) and prints how much will be reclaimable
 - `n` skips to the next item
-- `q` exits the interactive session without deleting remaining items
+- `q` exits the interactive session without moving remaining items
 - Items inside `/Applications` are always skipped with a reminder to use Finder
-- A summary is printed at the end: `Deleted X items, freed Y GB`
+- A summary is printed at the end showing how many items were moved and how much space is reclaimable
+
+> **Note:** `find-large --interactive` moves files to Trash (reversible). The `clean` command permanently deletes caches and logs, which is appropriate because those files are always regenerable.
 
 ### View cleaning history
 
