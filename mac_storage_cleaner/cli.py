@@ -114,6 +114,25 @@ def _delete(path: Path, dry_run: bool) -> bool:
         return False
 
 
+def _last_used(path: Path) -> float:
+    """Return the Spotlight last-used timestamp for path, falling back to st_atime."""
+    try:
+        result = subprocess.run(
+            ["mdls", "-name", "kMDItemLastUsedDate", "-raw", str(path)],
+            capture_output=True, text=True, timeout=5,
+        )
+        output = result.stdout.strip()
+        if output and output != "(null)":
+            dt = datetime.strptime(output, "%Y-%m-%d %H:%M:%S %z")
+            return dt.timestamp()
+    except Exception:
+        pass
+    try:
+        return path.stat().st_atime
+    except OSError:
+        return 0.0
+
+
 def _is_excluded(path: Path, excluded_names: set[str]) -> bool:
     path_lower = str(path).lower()
     return any(name in path_lower for name in excluded_names)
@@ -598,16 +617,18 @@ def _scan_recursive(
 
         if entry.is_dir(follow_symlinks=False):
             size = _dir_size(ep)
-            atime = st.st_atime
-            if size >= min_bytes and atime < cutoff:
-                results.append((ep, size, atime))
+            if size >= min_bytes:
+                last_used = _last_used(ep)
+                if last_used < cutoff:
+                    results.append((ep, size, last_used))
             elif depth < max_depth:
                 _scan_recursive(ep, min_bytes, cutoff, results, depth + 1, max_depth)
         else:
             size = st.st_size
-            atime = st.st_atime
-            if size >= min_bytes and atime < cutoff:
-                results.append((ep, size, atime))
+            if size >= min_bytes:
+                last_used = _last_used(ep)
+                if last_used < cutoff:
+                    results.append((ep, size, last_used))
 
 
 _APPS_MIN_BYTES = 500 * 1024 ** 2   # 500 MB
@@ -678,8 +699,10 @@ def find_large(min_size: str, days: int, interactive: bool):
                 except OSError:
                     continue
                 size = _dir_size(ep)
-                if size >= _APPS_MIN_BYTES and st.st_atime < cutoff_apps:
-                    results.append((ep, size, st.st_atime))
+                if size >= _APPS_MIN_BYTES:
+                    last_used = _last_used(ep)
+                    if last_used < cutoff_apps:
+                        results.append((ep, size, last_used))
         except (PermissionError, OSError):
             pass
 
