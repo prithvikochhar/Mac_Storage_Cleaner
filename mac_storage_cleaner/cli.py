@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import shutil
 import stat
@@ -181,7 +183,7 @@ def _available_dev_tools() -> list[str]:
     return [t for t in ("pip", "uv", "npm") if shutil.which(t) is not None]
 
 
-def _dev_cache_dir(tool: str) -> "Path | None":
+def _dev_cache_dir(tool: str) -> Path | None:
     try:
         if tool == "pip":
             r = subprocess.run(["pip", "cache", "dir"], capture_output=True, text=True, timeout=10)
@@ -277,7 +279,7 @@ def _history_group_name(name: str) -> str:
     return name.split(" (")[0]
 
 
-def _append_history(total_freed: int, group_totals: "list[tuple[str, int]]") -> None:
+def _append_history(total_freed: int, group_totals: list[tuple[str, int]]) -> None:
     log_path = _history_log_path()
     log_path.parent.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -311,13 +313,13 @@ def main():
 @click.option("--exclude", default=None,
               help="Comma-separated list of folder/app names to skip, "
                    "e.g. --exclude Spotify,Chrome (case-insensitive).")
-def clean(dry_run: bool, yes: bool, categories: "str | None", exclude: "str | None"):
+def clean(dry_run: bool, yes: bool, categories: str | None, exclude: str | None):
     """Delete browser caches, app caches, logs, and developer caches."""
     excluded_names: set[str] = set()
     if exclude:
         excluded_names = {e.strip().lower() for e in exclude.split(",")}
 
-    active_cats: "set[str] | None" = None
+    active_cats: set[str] | None = None
     if categories:
         active_cats = {c.strip().lower() for c in categories.split(",")}
         invalid = active_cats - VALID_CATEGORIES
@@ -552,7 +554,7 @@ def scan(min_size: str, days: int, search_path: str):
         accessed_str = f"{age_days} days ago"
         label = str(path).replace(str(HOME), "~")
         if age_days >= 365:
-            row_color: "str | None" = "red"
+            row_color: str | None = "red"
         elif age_days >= 180:
             row_color = "yellow"
         else:
@@ -659,7 +661,7 @@ _DOC_EXTS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pages"
 _ARCHIVE_SUFFIXES = (".zip", ".tar.gz", ".tar.bz2", ".tgz", ".rar", ".7z", ".tar.xz")
 
 
-def _detect_type(path: Path) -> "tuple[str, str | None]":
+def _detect_type(path: Path) -> tuple[str, str | None]:
     name = path.name.lower()
     if name.endswith(".app"):
         return "App", "(drag to Trash in Finder to uninstall properly)"
