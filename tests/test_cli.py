@@ -79,6 +79,20 @@ def test_detect_type_video(tmp_path):
     label, _ = _detect_type(p)
     assert label == "Video"
 
+def test_detect_type_dmg(tmp_path):
+    p = tmp_path / "SomeApp.dmg"
+    p.write_bytes(b"")
+    label, note = _detect_type(p)
+    assert label == "Installer"
+    assert note is not None
+
+def test_detect_type_pkg(tmp_path):
+    p = tmp_path / "Installer.pkg"
+    p.write_bytes(b"")
+    label, note = _detect_type(p)
+    assert label == "Installer"
+    assert note is not None
+
 
 # ---------------------------------------------------------------------------
 # _is_excluded

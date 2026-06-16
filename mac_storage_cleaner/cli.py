@@ -681,6 +681,8 @@ def _detect_type(path: Path) -> tuple[str, str | None]:
         return "App", "(drag to Trash in Finder to uninstall properly)"
     if any(name.endswith(s) for s in _ARCHIVE_SUFFIXES):
         return "ZIP archive", "(likely already extracted — safe to delete)"
+    if name.endswith((".dmg", ".pkg")):
+        return "Installer", "(installer — safe to delete after the app is installed)"
     if path.is_dir():
         try:
             path.relative_to(HOME / "Downloads")
