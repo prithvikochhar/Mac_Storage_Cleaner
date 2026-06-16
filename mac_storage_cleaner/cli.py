@@ -831,6 +831,86 @@ def find_large(min_size: str, days: int, interactive: bool, files_only: bool):
     ))
 
 
+_ANALYZE_MIN_BYTES = 100 * 1024 ** 2  # 100 MB
+_ANALYZE_TOP_N = 10
+
+_ANALYZE_SECTIONS = [
+    ("~/Library/Group Containers", "Library/Group Containers"),
+    ("~/Library/Containers", "Library/Containers"),
+    ("~/Library/Application Support", "Library/Application Support"),
+]
+
+
+def _reclaim_tip(name: str) -> str | None:
+    """Return a human-readable tip for reclaiming space, or None if no specific mapping exists."""
+    n = name.lower()
+    if "whatsapp" in n:
+        return "WhatsApp ▸ Settings ▸ Storage and Data ▸ Manage Storage"
+    if "onedrive" in n:
+        return "OneDrive ▸ Preferences ▸ enable Files On-Demand / Free up space"
+    if "dropbox" in n:
+        return "Dropbox ▸ Preferences ▸ enable Online-only / Smart Sync"
+    if ("google" in n and "drive" in n) or "drivefs" in n:
+        return "Google Drive ▸ Settings ▸ Stream files (don't mirror)"
+    if "teams" in n:
+        return "Teams ▸ Settings ▸ clear cache"
+    if "slack" in n:
+        return "Slack ▸ Preferences ▸ Advanced ▸ Reset cache"
+    if "spotify" in n:
+        return "Spotify ▸ Settings ▸ Storage ▸ clear cache"
+    if "docker" in n:
+        return "Use: mac-storage-cleaner clean-docker"
+    return None
+
+
+@main.command()
+def analyze():
+    """Show where large app data lives and how to reclaim it safely through each app."""
+    click.echo(click.style(
+        "ANALYZE — read-only. This command never deletes anything. "
+        "Large app data is best managed inside each app, not by deleting files directly.",
+        bold=True,
+    ))
+    click.echo()
+
+    for label, rel_path in _ANALYZE_SECTIONS:
+        directory = HOME / rel_path
+        if not directory.exists():
+            continue
+
+        try:
+            entries = [
+                (Path(e.path), _path_size(Path(e.path)))
+                for e in os.scandir(directory)
+            ]
+        except (PermissionError, OSError):
+            continue
+
+        above_min = [(p, s) for p, s in entries if s >= _ANALYZE_MIN_BYTES]
+        if not above_min:
+            continue
+
+        above_min.sort(key=lambda x: x[1], reverse=True)
+        top = above_min[:_ANALYZE_TOP_N]
+
+        click.echo(click.style(label, bold=True))
+        click.echo("-" * 70)
+        for path, size in top:
+            tip = _reclaim_tip(path.name) or "manage this inside the app's own settings"
+            click.echo(
+                click.style(f"{_human_size(size):>10}", fg="yellow") +
+                f"  {path.name}"
+            )
+            click.echo(f"            {click.style(chr(8594) + ' ' + tip, fg='cyan')}")
+        click.echo()
+
+    click.echo(click.style(
+        "Tip: Photos and iCloud Drive storage should be managed via "
+        "System Settings ▸ General ▸ Storage, not by deleting files.",
+        fg="cyan",
+    ))
+
+
 @main.command("clean-docker")
 @click.option("--dry-run", is_flag=True, default=False,
               help="Show Docker disk usage without removing anything.")

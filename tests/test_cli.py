@@ -11,6 +11,7 @@ from mac_storage_cleaner.cli import (
     _is_excluded,
     _parse_size,
     _path_size,
+    _reclaim_tip,
     main,
 )
 
@@ -192,3 +193,88 @@ def test_clean_dry_run(tmp_path):
 
     assert result.exit_code == 0
     assert "DRY RUN" in result.output
+
+
+# ---------------------------------------------------------------------------
+# _reclaim_tip
+# ---------------------------------------------------------------------------
+
+def test_reclaim_tip_whatsapp():
+    tip = _reclaim_tip("WhatsApp")
+    assert tip is not None
+    assert "WhatsApp" in tip
+
+def test_reclaim_tip_whatsapp_bundle_name():
+    tip = _reclaim_tip("group.net.whatsapp.WhatsApp.shared")
+    assert tip is not None
+    assert "WhatsApp" in tip
+
+def test_reclaim_tip_unknown_returns_none():
+    assert _reclaim_tip("com.some.obscure.app") is None
+
+def test_reclaim_tip_slack():
+    tip = _reclaim_tip("com.tinyspeck.slackmacgap")
+    assert tip is not None
+    assert "Slack" in tip
+
+def test_reclaim_tip_spotify():
+    tip = _reclaim_tip("com.spotify.client")
+    assert tip is not None
+    assert "Spotify" in tip
+
+def test_reclaim_tip_docker():
+    tip = _reclaim_tip("com.docker.docker")
+    assert tip is not None
+    assert "docker" in tip.lower()
+
+def test_reclaim_tip_google_drive():
+    tip = _reclaim_tip("com.google.drivefs")
+    assert tip is not None
+    assert "Google Drive" in tip
+
+
+# ---------------------------------------------------------------------------
+# analyze command
+# ---------------------------------------------------------------------------
+
+def test_analyze_exits_0():
+    runner = CliRunner()
+    result = runner.invoke(main, ["analyze"])
+    assert result.exit_code == 0
+    assert "ANALYZE" in result.output
+    assert "never deletes" in result.output
+
+def test_analyze_shows_tip_footer():
+    runner = CliRunner()
+    result = runner.invoke(main, ["analyze"])
+    assert result.exit_code == 0
+    assert "Photos" in result.output
+    assert "iCloud" in result.output
+
+def test_analyze_uses_known_mapping(tmp_path):
+    lib = tmp_path / "Library" / "Application Support"
+    whatsapp_dir = lib / "WhatsApp"
+    whatsapp_dir.mkdir(parents=True)
+    (whatsapp_dir / "big.bin").write_bytes(b"x" * (200 * 1024 * 1024))
+
+    runner = CliRunner()
+    with patch("mac_storage_cleaner.cli.HOME", tmp_path):
+        result = runner.invoke(main, ["analyze"])
+
+    assert result.exit_code == 0
+    assert "WhatsApp" in result.output
+    assert "Storage and Data" in result.output
+
+def test_analyze_generic_tip_for_unknown(tmp_path):
+    lib = tmp_path / "Library" / "Containers"
+    unknown_dir = lib / "com.obscure.unknownapp"
+    unknown_dir.mkdir(parents=True)
+    (unknown_dir / "data.bin").write_bytes(b"x" * (150 * 1024 * 1024))
+
+    runner = CliRunner()
+    with patch("mac_storage_cleaner.cli.HOME", tmp_path):
+        result = runner.invoke(main, ["analyze"])
+
+    assert result.exit_code == 0
+    assert "com.obscure.unknownapp" in result.output
+    assert "app's own settings" in result.output
