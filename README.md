@@ -8,6 +8,7 @@ A fast, safe macOS CLI tool to reclaim disk space by removing known junk files a
 - **`--dry-run`** flag — shows exactly what *would* be deleted and how much space would be freed, without touching anything
 - **`scan`** — finds files and folders larger than a configurable size that haven't been accessed in over 90 days (configurable), printing them as warnings
 - **`find-large`** — scans `~/Downloads`, `~/Documents`, and `/Applications` for large, unused items; shows type (App, ZIP archive, Installer, Folder, Video, Image, Document, or File) with context-specific cleanup tips
+- **`analyze`** — **read-only** report showing the largest items inside `~/Library/Group Containers`, `~/Library/Containers`, and `~/Library/Application Support`, with per-app guidance on how to reclaim space safely without deleting files directly
 - **`clean-docker`** — removes unused Docker containers, images, volumes, and build cache via `docker system prune`
 - **`history`** — displays a table of past cleaning runs with totals and per-category breakdown
 - **`schedule`** / **`unschedule`** — installs or removes a monthly launchd job that runs a dry-run scan on the 1st of each month at 9am and sends a macOS notification
@@ -151,6 +152,34 @@ Move to Trash? ~/Downloads/old-backup.zip [y/n/q(uit)]:
 
 > **Note:** `find-large --interactive` moves files to Trash (reversible). The `clean` command permanently deletes caches and logs, which is appropriate because those files are always regenerable.
 
+### Analyze where space is used (read-only)
+
+```bash
+mac-storage-cleaner analyze
+```
+
+`analyze` is **completely read-only — it never deletes anything**. It scans the three directories where macOS apps store their data:
+
+- `~/Library/Group Containers`
+- `~/Library/Containers`
+- `~/Library/Application Support`
+
+For each section it prints the top 10 entries above 100 MB (largest first), with a safe, app-specific tip for reclaiming the space:
+
+| App | How to reclaim space |
+|---|---|
+| WhatsApp | Settings ▸ Storage and Data ▸ Manage Storage |
+| OneDrive | Preferences ▸ enable Files On-Demand / Free up space |
+| Dropbox | Preferences ▸ enable Online-only / Smart Sync |
+| Google Drive | Settings ▸ Stream files (don't mirror) |
+| Microsoft Teams | Settings ▸ clear cache |
+| Slack | Preferences ▸ Advanced ▸ Reset cache |
+| Spotify | Settings ▸ Storage ▸ clear cache |
+| Docker | `mac-storage-cleaner clean-docker` |
+| Everything else | Manage inside the app's own settings |
+
+> **Why not just delete these files?** App containers often hold databases, indexes, and sync state. Deleting them directly can corrupt the app or force a full re-download. Use the in-app controls instead — they know what is safe to remove.
+
 ### View cleaning history
 
 ```bash
@@ -194,6 +223,7 @@ mac-storage-cleaner --help
 mac-storage-cleaner clean --help
 mac-storage-cleaner scan --help
 mac-storage-cleaner find-large --help
+mac-storage-cleaner analyze --help
 mac-storage-cleaner clean-docker --help
 mac-storage-cleaner history --help
 mac-storage-cleaner schedule --help
