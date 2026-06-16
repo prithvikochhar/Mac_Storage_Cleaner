@@ -600,9 +600,21 @@ _SKIP_DIRS = {
     "Library",      # ~/Library — system/app data, too broad and confusing
     "miniforge3",   # ~/miniforge3 — conda base env, large but intentional
     "node_modules", # ~/node_modules — global npm packages
+    "Pictures",     # contains Photos Library bundles managed by Apple
+    "Music",        # contains Music/iTunes library bundles managed by Apple
+    "Movies",       # contains TV/video library bundles managed by Apple
 }
 
 _SKIP_NAMES = {"node_modules", ".git", "__pycache__", ".venv", "venv"}
+
+# Apple-managed library bundles: mdls returns null last-used dates for these,
+# causing wildly wrong "days ago" values. Skip them entirely rather than report garbage.
+_LIBRARY_BUNDLE_SUFFIXES = (
+    ".photoslibrary",
+    ".musiclibrary",
+    ".tvlibrary",
+    ".photolibrary",
+)
 
 
 def _scan_recursive(
@@ -626,6 +638,8 @@ def _scan_recursive(
         if entry.name.startswith(".") and depth > 0:
             continue
         if entry.name in _SKIP_NAMES or entry.name in _SKIP_DIRS:
+            continue
+        if entry.name.endswith(_LIBRARY_BUNDLE_SUFFIXES):
             continue
 
         try:
