@@ -1,6 +1,6 @@
 [project]
 name = "mac-storage-cleaner"
-version = "1.0.0"
+version = "1.0.1"
 description = "A fast, safe macOS CLI tool to reclaim disk space"
 readme = "README.md"
 license = "MIT"
