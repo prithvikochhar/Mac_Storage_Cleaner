@@ -690,7 +690,9 @@ def _detect_type(path: Path) -> tuple[str, str | None]:
               help="Flag items in Downloads/Documents not accessed in this many days.")
 @click.option("--interactive", "-i", is_flag=True, default=False,
               help="Interactively prompt to delete each found item one by one.")
-def find_large(min_size: str, days: int, interactive: bool):
+@click.option("--files-only", "-f", is_flag=True, default=False,
+              help="Show only individual files; skip directories and the Applications scan.")
+def find_large(min_size: str, days: int, interactive: bool, files_only: bool):
     """Find large, unused files in Downloads, Documents, and Applications."""
     min_bytes = _parse_size(min_size)
     if min_bytes is None:
@@ -708,24 +710,27 @@ def find_large(min_size: str, days: int, interactive: bool):
         if folder.exists():
             _scan_recursive(folder, min_bytes, cutoff_docs, results, depth=0, max_depth=2)
 
-    apps_dir = Path("/Applications")
-    if apps_dir.exists():
-        try:
-            for entry in os.scandir(apps_dir):
-                if not entry.name.endswith(".app"):
-                    continue
-                ep = Path(entry.path)
-                try:
-                    st = entry.stat(follow_symlinks=False)
-                except OSError:
-                    continue
-                size = _dir_size(ep)
-                if size >= _APPS_MIN_BYTES:
-                    last_used = _last_used(ep)
-                    if last_used < cutoff_apps:
-                        results.append((ep, size, last_used))
-        except (PermissionError, OSError):
-            pass
+    if files_only:
+        results = [(p, s, a) for p, s, a in results if not p.is_dir()]
+    else:
+        apps_dir = Path("/Applications")
+        if apps_dir.exists():
+            try:
+                for entry in os.scandir(apps_dir):
+                    if not entry.name.endswith(".app"):
+                        continue
+                    ep = Path(entry.path)
+                    try:
+                        st = entry.stat(follow_symlinks=False)
+                    except OSError:
+                        continue
+                    size = _dir_size(ep)
+                    if size >= _APPS_MIN_BYTES:
+                        last_used = _last_used(ep)
+                        if last_used < cutoff_apps:
+                            results.append((ep, size, last_used))
+            except (PermissionError, OSError):
+                pass
 
     if not results:
         click.echo(click.style("No large unused items found.", fg="green"))

@@ -7,7 +7,7 @@ A fast, safe macOS CLI tool to reclaim disk space by removing known junk files a
 - **`clean`** — deletes browser caches (Chrome, Firefox, Safari), app caches in `~/Library/Caches`, conda package caches, log files in `~/Library/Logs`, and developer caches (pip, uv, npm); prompts for confirmation before deleting (bypass with `--yes`)
 - **`--dry-run`** flag — shows exactly what *would* be deleted and how much space would be freed, without touching anything
 - **`scan`** — finds files and folders larger than a configurable size that haven't been accessed in over 90 days (configurable), printing them as warnings
-- **`find-large`** — scans `~/Downloads`, `~/Documents`, and `/Applications` for large, unused items; shows type (App, ZIP archive, Folder, Video, Image, Document, or File) with context-specific cleanup tips
+- **`find-large`** — scans `~/Downloads`, `~/Documents`, and `/Applications` for large, unused items; shows type (App, ZIP archive, Installer, Folder, Video, Image, Document, or File) with context-specific cleanup tips
 - **`clean-docker`** — removes unused Docker containers, images, volumes, and build cache via `docker system prune`
 - **`history`** — displays a table of past cleaning runs with totals and per-category breakdown
 - **`schedule`** / **`unschedule`** — installs or removes a monthly launchd job that runs a dry-run scan on the 1st of each month at 9am and sends a macOS notification
@@ -116,8 +116,9 @@ This scans:
 - `~/Downloads` and `~/Documents` — items >100 MB not accessed in 30+ days
 - `/Applications` — apps >500 MB not opened in 180+ days
 
-Each result shows its **type** (App, ZIP archive, Folder, Video, Image, Document, or File) with a context-specific note:
+Each result shows its **type** (App, ZIP archive, Installer, Folder, Video, Image, Document, or File) with a context-specific note:
 - ZIP archives are flagged as likely safe to delete
+- Installer files (`.dmg`, `.pkg`) are flagged as safe to delete after the app is installed
 - Apps remind you to drag to Trash in Finder (not just delete)
 - Old folders in Downloads prompt you to inspect before deleting
 
@@ -126,6 +127,10 @@ Output ends with a **How to clean these up:** guide.
 ```bash
 # Customize thresholds for Downloads/Documents
 mac-storage-cleaner find-large --min-size 200MB --days 60
+
+# Show only individual files — skip directories and the Applications scan
+mac-storage-cleaner find-large --files-only
+# or: mac-storage-cleaner find-large -f
 
 # Interactively delete items one by one
 mac-storage-cleaner find-large --interactive
